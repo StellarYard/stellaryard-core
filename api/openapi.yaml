@@ -1,0 +1,310 @@
+openapi: "3.0.3"
+info:
+  title: stellaryard-core API
+  version: "1.0.0"
+  description: |
+    REST API for stellaryard-core, the orchestration engine for StellarYard.
+    Dashboard and CLI generate their clients from this file — it is the
+    source of truth for the API contract. Do not make breaking changes
+    without versioning (e.g., /api/v2/...).
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+
+paths:
+  /containers:
+    get:
+      summary: List container statuses
+      operationId: listContainers
+      responses:
+        "200":
+          description: List of container statuses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContainerStatus"
+
+  /containers/{name}/start:
+    post:
+      summary: Start a container
+      operationId: startContainer
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [horizon, soroban-rpc]
+      responses:
+        "200":
+          description: Container started
+        "404":
+          description: Container not found
+
+  /containers/{name}/stop:
+    post:
+      summary: Stop a container
+      operationId: stopContainer
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [horizon, soroban-rpc]
+      responses:
+        "200":
+          description: Container stopped
+        "404":
+          description: Container not found
+
+  /containers/{name}/logs:
+    get:
+      summary: Stream container logs via WebSocket
+      operationId: streamContainerLogs
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [horizon, soroban-rpc]
+      responses:
+        "101":
+          description: WebSocket upgrade
+
+  /accounts:
+    post:
+      summary: Create and fund a new test account
+      operationId: createAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAccountRequest"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+    get:
+      summary: List managed accounts
+      operationId: listAccounts
+      responses:
+        "200":
+          description: List of accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Account"
+
+  /accounts/{publicKey}:
+    get:
+      summary: Get account detail and balance
+      operationId: getAccount
+      parameters:
+        - name: publicKey
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "404":
+          description: Account not found
+
+  /contracts/deploy:
+    post:
+      summary: Deploy a WASM contract
+      operationId: deployContract
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeployContractRequest"
+      responses:
+        "201":
+          description: Contract deployed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContractDeployment"
+
+  /contracts/{contractId}/invoke:
+    post:
+      summary: Invoke a contract method
+      operationId: invokeContract
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvokeContractRequest"
+      responses:
+        "200":
+          description: Contract invocation result
+
+  /ledger/snapshot:
+    get:
+      summary: Current ledger state summary
+      operationId: getLedgerSnapshot
+      responses:
+        "200":
+          description: Ledger snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerSnapshot"
+
+  /ledger/transactions:
+    get:
+      summary: Recent transactions (paginated)
+      operationId: listTransactions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Paginated transaction list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+components:
+  schemas:
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+        publicKey:
+          type: string
+        label:
+          type: string
+        network:
+          type: string
+          enum: [local, testnet]
+        balance:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateAccountRequest:
+      type: object
+      properties:
+        label:
+          type: string
+        network:
+          type: string
+          enum: [local, testnet]
+          default: testnet
+
+    ContainerStatus:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [horizon, soroban-rpc]
+        state:
+          type: string
+          enum: [running, stopped, error]
+        health:
+          type: string
+          enum: [healthy, unhealthy, starting]
+        started:
+          type: string
+          format: date-time
+
+    ContractDeployment:
+      type: object
+      properties:
+        id:
+          type: string
+        wasmHash:
+          type: string
+        contractId:
+          type: string
+        deployedBy:
+          type: string
+        network:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    DeployContractRequest:
+      type: object
+      properties:
+        wasmPath:
+          type: string
+
+    InvokeContractRequest:
+      type: object
+      properties:
+        method:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+
+    LedgerSnapshot:
+      type: object
+      properties:
+        sequence:
+          type: integer
+          format: uint32
+        timestamp:
+          type: string
+          format: date-time
+        txCount:
+          type: integer
+
+    Transaction:
+      type: object
+      properties:
+        hash:
+          type: string
+        sequence:
+          type: integer
+        source:
+          type: string
+        fee:
+          type: integer
+        success:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time

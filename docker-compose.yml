@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  horizon:
+    image: stellar/stellar-horizon:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgres://stellar:stellar@postgres/horizon?sslmode=disable
+      - STELLAR_NETWORK=testnet
+      - LOG_LEVEL=info
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # NOTE: Health check verifies port is open, not that Horizon is synced.
+    # Real health check should query actual Stellar API responsiveness.
+
+  soroban-rpc:
+    image: stellar/soroban-rpc:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - STELLAR_NETWORK=testnet
+      - HORIZON_URL=http://horizon:8000
+    depends_on:
+      - horizon
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=stellar
+      - POSTGRES_PASSWORD=stellar
+      - POSTGRES_DB=horizon
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

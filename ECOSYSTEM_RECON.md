@@ -12,7 +12,7 @@
 - **Soroban RPC**: Local and testnet RPC endpoints for contract invocation
 - **Horizon API**: REST API for ledger queries, account management, transaction submission
 
-### Drips Wave Program — Current State
+### Stellar Wave Program — Current State
 
 | Metric | Value |
 |--------|-------|

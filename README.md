@@ -12,7 +12,6 @@
   <a href="https://github.com/StellarYard/stellaryard-core/blob/main/LICENSE"><img src="https://img.shields.io/github/license/StellarYard/stellaryard-core?style=flat-square" alt="License"/></a>
   <a href="https://github.com/StellarYard/stellaryard-core/actions"><img src="https://img.shields.io/github/actions/workflow/status/StellarYard/stellaryard-core/ci.yml?style=flat-square&label=CI" alt="CI"/></a>
   <a href="https://github.com/StellarYard/stellaryard-core/issues"><img src="https://img.shields.io/github/issues/StellarYard/stellaryard-core?style=flat-square" alt="Issues"/></a>
-  <a href="https://www.drips.network/wave/stellar"><img src="https://img.shields.io/badge/Drips%20Wave-Stellar-7c3aed?style=flat-square" alt="Drips Wave"/></a>
 </p>
 
 ---
@@ -118,7 +117,6 @@ We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guideline
 ## Community
 
 - [GitHub Discussions](https://github.com/StellarYard/stellaryard-core/discussions)
-- [Drips Wave — Stellar](https://www.drips.network/wave/stellar)
 
 ## License
 
@@ -127,5 +125,5 @@ We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guideline
 ---
 
 <p align="center">
-  Built for the <a href="https://www.drips.network/wave/stellar">Stellar Wave Program</a>
+  Built for the Stellar ecosystem
 </p>

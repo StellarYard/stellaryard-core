@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/StellarYard/stellaryard-core/internal/docker"
 	"github.com/StellarYard/stellaryard-core/internal/storage"
+	"github.com/go-chi/chi/v5"
 )
 
 // Handlers holds dependencies for API handlers.

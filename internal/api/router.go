@@ -3,10 +3,10 @@ package api
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/StellarYard/stellaryard-core/internal/docker"
 	"github.com/StellarYard/stellaryard-core/internal/storage"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 // NewRouter creates the chi router with all v1 endpoints.

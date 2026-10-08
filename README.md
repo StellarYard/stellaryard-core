@@ -61,18 +61,23 @@ The API is available at `http://localhost:8080/api/v1`.
 
 ## API Endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/containers/{name}/start` | Start a container |
-| POST | `/containers/{name}/stop` | Stop a container |
-| GET | `/containers` | List container statuses |
-| WS | `/containers/{name}/logs` | Stream container logs |
-| POST | `/accounts` | Create + fund a test account |
-| GET | `/accounts` | List managed accounts |
-| POST | `/contracts/deploy` | Deploy a WASM contract |
-| POST | `/contracts/{id}/invoke` | Invoke a contract method |
-| GET | `/ledger/snapshot` | Current ledger state |
-| GET | `/ledger/transactions` | Recent transactions |
+Endpoints below reflect what is implemented today. Anything returning `501` or a
+placeholder payload is tracked in the issue tracker and is not yet functional.
+
+| Method | Path | Status | Purpose |
+|--------|------|--------|---------|
+| GET | `/health` | ✅ | Liveness probe |
+| POST | `/containers/{name}/start` | ✅ | Start a container |
+| POST | `/containers/{name}/stop` | ✅ | Stop a container |
+| GET | `/containers` | ✅ | List container statuses |
+| POST | `/accounts` | ✅ | Create a test account (placeholder keypair) |
+| GET | `/accounts` | ✅ | List managed accounts |
+| GET | `/accounts/{publicKey}` | ✅ | Fetch one account |
+| POST | `/contracts/deploy` | 🚧 `501` | Deploy a WASM contract |
+| POST | `/contracts/{id}/invoke` | 🚧 `501` | Invoke a contract method |
+| GET | `/ledger/snapshot` | 🚧 placeholder | Current ledger state |
+| GET | `/ledger/transactions` | 🚧 placeholder | Recent transactions |
+| WS | `/containers/{name}/logs` | 📋 planned | Stream container logs |
 
 Full spec: [`api/openapi.yaml`](./api/openapi.yaml)
 
@@ -89,14 +94,17 @@ Full spec: [`api/openapi.yaml`](./api/openapi.yaml)
 
 ## Roadmap
 
+Status is tracked against the code on `main`, not intent.
+
 | Phase | Scope | Status |
 |-------|-------|--------|
-| 0 — Foundation | Scaffold, OpenAPI, SQLite, Signer | Not started |
-| 1 — Containers | Docker API, health checks, log streaming | Not started |
-| 2 — Accounts | Account CRUD, Friendbot funding | Not started |
-| 3 — Ledger | Snapshot, transactions, XDR decoding | Not started |
-| 4 — Contracts | WASM deploy, invocation, persistence | Not started |
-| 5 — Hardening | Error handling, testing, documentation | Not started |
+| 0 — Foundation | Scaffold, OpenAPI, SQLite, Signer | ✅ Done |
+| 1 — Containers | Docker start/stop/status | ✅ Done |
+| 1 — Containers | Health check verification, WebSocket log streaming | 🚧 In progress |
+| 2 — Accounts | Create/list/get against SQLite | ✅ Done (placeholder keypairs, no Friendbot) |
+| 3 — Ledger | Snapshot, transactions | 🚧 Stub — returns placeholder data |
+| 4 — Contracts | WASM deploy, invocation | 🚧 Stub — returns `501 Not Implemented` |
+| 5 — Hardening | Tests, error handling, documentation | 🔜 Not started |
 
 Full roadmap: [`ROADMAP.md`](./ROADMAP.md)
 

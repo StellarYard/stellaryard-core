@@ -14,23 +14,29 @@ type DB struct {
 }
 
 // Account represents a managed test account.
+//
+// JSON tags follow api/openapi.yaml (camelCase). SecretKey is deliberately
+// excluded from serialization: the OpenAPI spec does not promise it, no
+// client consumes it, and returning key material over the API would be a
+// needless exposure even for testnet credentials.
 type Account struct {
-	ID        string
-	PublicKey string
-	SecretKey string // testnet only
-	Label     string
-	Network   string // "local" | "testnet"
-	CreatedAt time.Time
+	ID        string    `json:"id"`
+	PublicKey string    `json:"publicKey"`
+	SecretKey string    `json:"-"` // testnet only; never serialized
+	Label     string    `json:"label"`
+	Network   string    `json:"network"` // "local" | "testnet"
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // ContractDeployment represents a deployed Soroban contract.
+// JSON tags follow api/openapi.yaml (camelCase).
 type ContractDeployment struct {
-	ID         string
-	WASMHash   string
-	ContractID string
-	DeployedBy string
-	Network    string
-	CreatedAt  time.Time
+	ID         string    `json:"id"`
+	WASMHash   string    `json:"wasmHash"`
+	ContractID string    `json:"contractId"`
+	DeployedBy string    `json:"deployedBy"`
+	Network    string    `json:"network"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 // Open opens or creates a SQLite database and runs migrations.

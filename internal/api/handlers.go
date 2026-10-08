@@ -1,6 +1,8 @@
 package api
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -85,8 +87,8 @@ func (h *Handlers) CreateAccount(w http.ResponseWriter, r *http.Request) {
 
 	acc := &storage.Account{
 		ID:        generateID(),
-		PublicKey: "G" + generateID()[:55], // Placeholder
-		SecretKey: "S" + generateID()[:55], // Placeholder — testnet only
+		PublicKey: placeholderKey("G"), // Placeholder — testnet only
+		SecretKey: placeholderKey("S"), // Placeholder — testnet only
 		Label:     req.Label,
 		Network:   "local",
 		CreatedAt: time.Now(),
@@ -159,8 +161,32 @@ func (h *Handlers) ListTransactions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, []interface{}{})
 }
 
-// generateID generates a simple unique ID.
-// In production, use UUID or similar.
+// generateID returns a random 32-character hexadecimal identifier.
 func generateID() string {
-	return time.Now().Format("20060102150405.000000000")
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		// crypto/rand has no failure path on the platforms we target; fall
+		// back to a timestamp so the request still completes rather than
+		// panicking.
+		return hex.EncodeToString([]byte(time.Now().UTC().Format("20060102150405.000000000")))[:32]
+	}
+	return hex.EncodeToString(b)
+}
+
+// placeholderKey returns a Stellar-shaped test key: exactly 56 characters
+// beginning with prefix, matching the length of a real Stellar public or
+// secret key so downstream formatting and validation behave normally.
+//
+// It is NOT a real keypair and must never be used outside a local or
+// testnet context.
+func placeholderKey(prefix string) string {
+	const stellarKeyLen = 56
+	if len(prefix) >= stellarKeyLen {
+		return prefix
+	}
+	id := generateID()
+	for len(prefix)+len(id) < stellarKeyLen {
+		id += id
+	}
+	return prefix + id[:stellarKeyLen-len(prefix)]
 }

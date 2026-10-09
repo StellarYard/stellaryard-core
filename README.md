@@ -38,6 +38,21 @@ go run cmd/server/main.go
 
 The API is available at `http://localhost:8080/api/v1`.
 
+### Configuration & Security
+
+StellarYard Core is configured via environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STELLARYARD_HOST` | `127.0.0.1` | Network interface to bind (`127.0.0.1`, `0.0.0.0`, etc.) |
+| `STELLARYARD_PORT` | `8080` | Port for the HTTP API |
+| `STELLARYARD_API_KEY` | *(empty)* | Bearer authentication token for `/api/v1` routes |
+| `STELLARYARD_DB_PATH` | `./stellaryard.db` | Path to SQLite database file |
+
+- **Local Development**: By default, Core binds to `127.0.0.1` and allows unauthenticated access for frictionless local development.
+- **Remote / Network Access**: When `STELLARYARD_HOST` is bound to any non-loopback interface (e.g. `0.0.0.0`), Core **requires** `STELLARYARD_API_KEY` with a minimum length of 32 characters. Core will fail closed and refuse to start without a valid key.
+- **TLS Termination Requirement**: Core serves plain HTTP. **Never expose the plain HTTP listener directly to untrusted networks or the public internet.** Remote access must be routed through a trusted TLS-terminating reverse proxy (e.g. Caddy, NGINX, AWS ALB) or an encrypted private overlay network (e.g. WireGuard, Tailscale).
+
 ## Architecture
 
 ```

@@ -23,7 +23,7 @@ func newTestRouter(t *testing.T) http.Handler {
 		t.Fatalf("storage.Open() failed: %v", err)
 	}
 	t.Cleanup(func() { db.Close() })
-	return NewRouter(nil, db, signer.NewLocalTestSigner())
+	return NewRouter(nil, db, signer.NewLocalTestSigner(), "")
 }
 
 func doRequest(t *testing.T, h http.Handler, method, target, body string) *httptest.ResponseRecorder {
@@ -291,7 +291,7 @@ func TestCreateAccountUsesSDKAndSigner(t *testing.T) {
 	}
 	defer db.Close()
 
-	router := NewRouter(nil, db, s)
+	router := NewRouter(nil, db, s, "")
 	rec := doRequest(t, router, http.MethodPost, "/api/v1/accounts", `{"label":"sdk-acc"}`)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("POST /api/v1/accounts = %d, want 201: %s", rec.Code, rec.Body.String())
@@ -317,5 +317,71 @@ func TestCreateAccountUsesSDKAndSigner(t *testing.T) {
 	}
 	if acc.PublicKey != created.PublicKey {
 		t.Errorf("db public key %s != created %s", acc.PublicKey, created.PublicKey)
+	}
+}
+
+func TestContainerNameValidation(t *testing.T) {
+	h := newTestRouter(t)
+
+	// Valid container start/stop routes (require docker client, but fail at docker level, not validation)
+	// Invalid container name should be rejected immediately with 400 INVALID_CONTAINER
+	rec := doRequest(t, h, http.MethodPost, "/api/v1/containers/unknown-malicious-container/start", "")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST with invalid container name = %d, want 400", rec.Code)
+	}
+
+	e := errorBody(t, rec)
+	if e.Error.Code != "INVALID_CONTAINER" {
+		t.Errorf("error code = %q, want INVALID_CONTAINER", e.Error.Code)
+	}
+}
+
+func TestAuthenticationMiddleware(t *testing.T) {
+	s := signer.NewLocalTestSigner()
+	db, err := storage.Open(filepath.Join(t.TempDir(), "auth-test.db"))
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer db.Close()
+
+	const testAPIKey = "super-secret-core-token-xyz"
+	router := NewRouter(nil, db, s, testAPIKey)
+
+	// 1. /health remains public and unauthenticated
+	recHealth := doRequest(t, router, http.MethodGet, "/health", "")
+	if recHealth.Code != http.StatusOK {
+		t.Errorf("GET /health = %d, want 200", recHealth.Code)
+	}
+
+	// 2. Unauthenticated request to /api/v1/accounts rejected with 401
+	recNoAuth := doRequest(t, router, http.MethodGet, "/api/v1/accounts", "")
+	if recNoAuth.Code != http.StatusUnauthorized {
+		t.Fatalf("GET /api/v1/accounts without auth = %d, want 401", recNoAuth.Code)
+	}
+	eNoAuth := errorBody(t, recNoAuth)
+	if eNoAuth.Error.Code != "UNAUTHORIZED" {
+		t.Errorf("error code = %q, want UNAUTHORIZED", eNoAuth.Error.Code)
+	}
+
+	// 3. Request with invalid token rejected with 401
+	reqBad := httptest.NewRequest(http.MethodGet, "/api/v1/accounts", nil)
+	reqBad.Header.Set("Authorization", "Bearer invalid-wrong-token")
+	recBad := httptest.NewRecorder()
+	router.ServeHTTP(recBad, reqBad)
+	if recBad.Code != http.StatusUnauthorized {
+		t.Fatalf("GET /api/v1/accounts with bad auth = %d, want 401", recBad.Code)
+	}
+	// Verify token is NOT leaked in response
+	if strings.Contains(recBad.Body.String(), "invalid-wrong-token") || strings.Contains(recBad.Body.String(), testAPIKey) {
+		t.Error("error response leaked token strings")
+	}
+
+	// 4. Request with valid token accepted
+	reqGood := httptest.NewRequest(http.MethodGet, "/api/v1/accounts", nil)
+	reqGood.Header.Set("Authorization", "Bearer "+testAPIKey)
+	recGood := httptest.NewRecorder()
+	router.ServeHTTP(recGood, reqGood)
+	if recGood.Code != http.StatusOK {
+		t.Fatalf("GET /api/v1/accounts with valid auth = %d, want 200", recGood.Code)
 	}
 }

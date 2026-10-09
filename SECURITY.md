@@ -47,9 +47,12 @@ StellarYard Core requires Docker access. The application should run with minimum
 
 SQLite files contain account data and contract deployments. Ensure proper file permissions on the database file.
 
-### API Authentication
+### API Authentication & Deployment Security
 
-The V1 API has no authentication (localhost only). If exposing the API beyond localhost, implement appropriate auth before doing so.
+- **Loopback Development Mode**: By default, StellarYard Core binds exclusively to `127.0.0.1:8080`. When `STELLARYARD_API_KEY` is unset on a loopback interface (`127.0.0.1`, `localhost`, `::1`), authentication is disabled to streamline local development.
+- **Non-Loopback Listener Hardening**: If configured to bind to a non-loopback host (such as `0.0.0.0` or a routable network interface via `STELLARYARD_HOST`), Core enforces a fail-closed startup policy: it refuses to start unless `STELLARYARD_API_KEY` is configured with a cryptographically strong secret of at least 32 characters.
+- **Transport Security (TLS / Private Network)**: StellarYard Core provides a plain HTTP listener. **Never expose the plain HTTP listener directly to untrusted networks or the public internet.** Doing so risks exposing Bearer authentication tokens and sensitive operational commands to packet inspection and interception. For remote or containerized deployments, Core **must** be placed behind a trusted TLS-terminating reverse proxy (e.g., Caddy, NGINX, AWS ALB, Cloudflare) that enforces HTTPS, or accessed strictly over an encrypted private overlay network (e.g., WireGuard, Tailscale).
+- **Strong Key Provisioning**: Generate `STELLARYARD_API_KEY` using a cryptographically secure random generator (e.g., `openssl rand -hex 32` or `head -c 32 /dev/urandom | base64`). Store and inject the key via secure secret management rather than hardcoding it.
 
 ## Disclosure Policy
 

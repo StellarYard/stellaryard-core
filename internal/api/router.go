@@ -37,7 +37,9 @@ func isOriginAllowed(origin string) bool {
 }
 
 // NewRouter creates the chi router with all v1 endpoints.
-func NewRouter(dockerClient *docker.Client, db *storage.DB, s signer.Signer) *chi.Mux {
+// If apiKey is non-empty, all routes under /api/v1 require Authorization: Bearer <apiKey>.
+// /health remains public for operational liveness probes.
+func NewRouter(dockerClient *docker.Client, db *storage.DB, s signer.Signer, apiKey string) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Middleware
@@ -80,6 +82,9 @@ func NewRouter(dockerClient *docker.Client, db *storage.DB, s signer.Signer) *ch
 	}
 
 	r.Route("/api/v1", func(r chi.Router) {
+		// Apply authentication middleware when configured
+		r.Use(RequireAuth(apiKey))
+
 		// Containers
 		r.Get("/containers", h.ListContainers)
 		r.Post("/containers/{name}/start", h.StartContainer)

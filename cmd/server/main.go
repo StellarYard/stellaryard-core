@@ -11,23 +11,31 @@ import (
 	"time"
 
 	"github.com/StellarYard/stellaryard-core/internal/api"
+	"github.com/StellarYard/stellaryard-core/internal/config"
 	"github.com/StellarYard/stellaryard-core/internal/docker"
 	"github.com/StellarYard/stellaryard-core/internal/signer"
 	"github.com/StellarYard/stellaryard-core/internal/storage"
 )
 
 func main() {
-	// Configuration
-	port := os.Getenv("STELLARYARD_PORT")
-	if port == "" {
-		port = "8080"
+	// Configuration loading & validation
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
 	}
+
 	dbPath := os.Getenv("STELLARYARD_DB_PATH")
 	if dbPath == "" {
 		dbPath = "./stellaryard.db"
 	}
 
-	log.Printf("Starting stellaryard-core on port %s", port)
+	if cfg.APIKey == "" {
+		log.Printf("⚠️  WARNING: Running in unauthenticated local development mode on %s. Authentication is DISABLED.", cfg.Address())
+	} else {
+		log.Printf("🔒 Authentication enabled (Bearer token required on all /api/v1 routes)")
+	}
+
+	log.Printf("Starting stellaryard-core on %s", cfg.Address())
 
 	// Initialize storage
 	db, err := storage.Open(dbPath)
@@ -48,12 +56,12 @@ func main() {
 	// Initialize Signer (holds testnet keys in-memory behind interface boundary)
 	signService := signer.NewLocalTestSigner()
 
-	// Create router
-	router := api.NewRouter(dockerClient, db, signService)
+	// Create router with authentication configuration
+	router := api.NewRouter(dockerClient, db, signService, cfg.APIKey)
 
 	// Create HTTP server
 	srv := &http.Server{
-		Addr:         ":" + port,
+		Addr:         cfg.Address(),
 		Handler:      router,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -62,7 +70,7 @@ func main() {
 
 	// Start server in goroutine
 	go func() {
-		log.Printf("API server listening on http://localhost:%s", port)
+		log.Printf("API server listening on http://%s", cfg.Address())
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed: %v", err)
 		}

@@ -47,6 +47,16 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	json.NewEncoder(w).Encode(data)
 }
 
+// validContainerNames contains allowed container identifiers per openapi.yaml
+var validContainerNames = map[string]bool{
+	"horizon":     true,
+	"soroban-rpc": true,
+}
+
+func isValidContainer(name string) bool {
+	return validContainerNames[name]
+}
+
 // --- Container Handlers ---
 
 func (h *Handlers) ListContainers(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +70,10 @@ func (h *Handlers) ListContainers(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) StartContainer(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
+	if !isValidContainer(name) {
+		writeError(w, http.StatusBadRequest, "INVALID_CONTAINER", "Unknown container name: "+name)
+		return
+	}
 	if err := h.docker.Start(r.Context(), name); err != nil {
 		writeError(w, http.StatusBadRequest, "CONTAINER_START_FAILED", err.Error())
 		return
@@ -69,6 +83,10 @@ func (h *Handlers) StartContainer(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) StopContainer(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
+	if !isValidContainer(name) {
+		writeError(w, http.StatusBadRequest, "INVALID_CONTAINER", "Unknown container name: "+name)
+		return
+	}
 	if err := h.docker.Stop(r.Context(), name); err != nil {
 		writeError(w, http.StatusBadRequest, "CONTAINER_STOP_FAILED", err.Error())
 		return

@@ -144,8 +144,26 @@ func (c *Client) ListStatus(ctx context.Context) ([]ContainerStatus, error) {
 	return statuses, nil
 }
 
+// LogOptions specifies parameters for retrieving container logs.
+type LogOptions struct {
+	ShowStdout bool
+	ShowStderr bool
+	Follow     bool
+	Tail       string
+}
+
+// DefaultLogOptions returns default options (100 tail lines, follow, both stdout & stderr).
+func DefaultLogOptions() LogOptions {
+	return LogOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     true,
+		Tail:       "100",
+	}
+}
+
 // Logs returns a reader for container logs.
-func (c *Client) Logs(ctx context.Context, name string) (io.ReadCloser, error) {
+func (c *Client) Logs(ctx context.Context, name string, opts LogOptions) (io.ReadCloser, error) {
 	if !validContainers[name] {
 		return nil, fmt.Errorf("unknown container: %s", name)
 	}
@@ -155,11 +173,16 @@ func (c *Client) Logs(ctx context.Context, name string) (io.ReadCloser, error) {
 		return nil, err
 	}
 
+	tail := opts.Tail
+	if tail == "" {
+		tail = "100"
+	}
+
 	return c.docker.ContainerLogs(ctx, containerID, container.LogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-		Follow:     true,
-		Tail:       "100",
+		ShowStdout: opts.ShowStdout,
+		ShowStderr: opts.ShowStderr,
+		Follow:     opts.Follow,
+		Tail:       tail,
 	})
 }
 

@@ -430,4 +430,3 @@ func TestStreamContainerLogsEndpoint(t *testing.T) {
 		t.Errorf("request with evil origin = %d, want 403 Forbidden", disallowedRec.Code)
 	}
 }
-

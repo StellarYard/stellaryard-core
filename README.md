@@ -92,7 +92,7 @@ placeholder payload is tracked in the issue tracker and is not yet functional.
 | POST | `/contracts/{id}/invoke` | 🚧 `501` | Invoke a contract method |
 | GET | `/ledger/snapshot` | 🚧 placeholder | Current ledger state |
 | GET | `/ledger/transactions` | 🚧 placeholder | Recent transactions |
-| WS | `/containers/{name}/logs` | 📋 planned | Stream container logs |
+| GET (WS) | `/containers/{name}/logs` | ✅ | Stream container logs via WebSocket |
 
 Full spec: [`api/openapi.yaml`](./api/openapi.yaml)
 
@@ -115,7 +115,7 @@ Status is tracked against the code on `main`, not intent.
 |-------|-------|--------|
 | 0 — Foundation | Scaffold, OpenAPI, SQLite, Signer | ✅ Done |
 | 1 — Containers | Docker start/stop/status | ✅ Done |
-| 1 — Containers | Health check verification, WebSocket log streaming | 🚧 In progress |
+| 1 — Containers | WebSocket log streaming (`/containers/{name}/logs`) | ✅ Done |
 | 2 — Accounts | Create/list/get against SQLite | ✅ Done (placeholder keypairs, no Friendbot) |
 | 3 — Ledger | Snapshot, transactions | 🚧 Stub — returns placeholder data |
 | 4 — Contracts | WASM deploy, invocation | 🚧 Stub — returns `501 Not Implemented` |

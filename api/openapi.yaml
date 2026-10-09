@@ -12,6 +12,9 @@ servers:
   - url: http://localhost:8080/api/v1
     description: Local development server
 
+security:
+  - bearerAuth: []
+
 paths:
   /containers:
     get:
@@ -202,6 +205,12 @@ paths:
                   $ref: "#/components/schemas/Transaction"
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication required when Core is configured with STELLARYARD_API_KEY.
+
   schemas:
     Account:
       type: object

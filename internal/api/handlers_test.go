@@ -377,12 +377,31 @@ func TestAuthenticationMiddleware(t *testing.T) {
 	}
 
 	// 4. Request with valid token accepted
+	// 4. Request with valid token accepted
 	reqGood := httptest.NewRequest(http.MethodGet, "/api/v1/accounts", nil)
 	reqGood.Header.Set("Authorization", "Bearer "+testAPIKey)
 	recGood := httptest.NewRecorder()
 	router.ServeHTTP(recGood, reqGood)
 	if recGood.Code != http.StatusOK {
 		t.Fatalf("GET /api/v1/accounts with valid auth = %d, want 200", recGood.Code)
+	}
+
+	// 5. Request with valid session cookie accepted
+	reqCookieGood := httptest.NewRequest(http.MethodGet, "/api/v1/accounts", nil)
+	reqCookieGood.AddCookie(&http.Cookie{Name: "stellaryard_session", Value: testAPIKey})
+	recCookieGood := httptest.NewRecorder()
+	router.ServeHTTP(recCookieGood, reqCookieGood)
+	if recCookieGood.Code != http.StatusOK {
+		t.Fatalf("GET /api/v1/accounts with valid session cookie = %d, want 200", recCookieGood.Code)
+	}
+
+	// 6. Request with invalid session cookie rejected with 401
+	reqCookieBad := httptest.NewRequest(http.MethodGet, "/api/v1/accounts", nil)
+	reqCookieBad.AddCookie(&http.Cookie{Name: "stellaryard_session", Value: "wrong-session-cookie"})
+	recCookieBad := httptest.NewRecorder()
+	router.ServeHTTP(recCookieBad, reqCookieBad)
+	if recCookieBad.Code != http.StatusUnauthorized {
+		t.Fatalf("GET /api/v1/accounts with bad session cookie = %d, want 401", recCookieBad.Code)
 	}
 }
 
@@ -428,5 +447,32 @@ func TestStreamContainerLogsEndpoint(t *testing.T) {
 	router.ServeHTTP(disallowedRec, disallowedOriginReq)
 	if disallowedRec.Code != http.StatusForbidden {
 		t.Errorf("request with evil origin = %d, want 403 Forbidden", disallowedRec.Code)
+	}
+
+	// 4. WebSocket upgrade with valid session cookie rejected for disallowed origin (verifying auth passed and origin check engaged)
+	cookieOriginReq := httptest.NewRequest(http.MethodGet, "/api/v1/containers/horizon/logs", nil)
+	cookieOriginReq.AddCookie(&http.Cookie{Name: "stellaryard_session", Value: testAPIKey})
+	cookieOriginReq.Header.Set("Origin", "http://evil-attacker-site.com")
+	cookieOriginReq.Header.Set("Connection", "Upgrade")
+	cookieOriginReq.Header.Set("Upgrade", "websocket")
+	cookieOriginReq.Header.Set("Sec-WebSocket-Version", "13")
+	cookieOriginReq.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	cookieRec := httptest.NewRecorder()
+	router.ServeHTTP(cookieRec, cookieOriginReq)
+	if cookieRec.Code != http.StatusForbidden {
+		t.Errorf("request with session cookie and evil origin = %d, want 403 Forbidden", cookieRec.Code)
+	}
+
+	// 5. WebSocket upgrade with invalid session cookie rejected with 401
+	cookieBadReq := httptest.NewRequest(http.MethodGet, "/api/v1/containers/horizon/logs", nil)
+	cookieBadReq.AddCookie(&http.Cookie{Name: "stellaryard_session", Value: "invalid-key"})
+	cookieBadReq.Header.Set("Connection", "Upgrade")
+	cookieBadReq.Header.Set("Upgrade", "websocket")
+	cookieBadReq.Header.Set("Sec-WebSocket-Version", "13")
+	cookieBadReq.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	cookieBadRec := httptest.NewRecorder()
+	router.ServeHTTP(cookieBadRec, cookieBadReq)
+	if cookieBadRec.Code != http.StatusUnauthorized {
+		t.Errorf("request with invalid session cookie = %d, want 401 Unauthorized", cookieBadRec.Code)
 	}
 }

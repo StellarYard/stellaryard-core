@@ -89,6 +89,7 @@ func NewRouter(dockerClient *docker.Client, db *storage.DB, s signer.Signer, api
 		r.Get("/containers", h.ListContainers)
 		r.Post("/containers/{name}/start", h.StartContainer)
 		r.Post("/containers/{name}/stop", h.StopContainer)
+		r.Get("/containers/{name}/logs", h.StreamContainerLogs)
 
 		// Accounts
 		r.Post("/accounts", h.CreateAccount)

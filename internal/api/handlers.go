@@ -1,16 +1,19 @@
 package api
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/StellarYard/stellaryard-core/internal/docker"
 	"github.com/StellarYard/stellaryard-core/internal/signer"
 	"github.com/StellarYard/stellaryard-core/internal/storage"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/websocket"
 )
 
 // Handlers holds dependencies for API handlers.
@@ -92,6 +95,98 @@ func (h *Handlers) StopContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped", "name": name})
+}
+
+// wsUpgrader configures gorilla/websocket upgrade with strict origin check.
+var wsUpgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		// Non-browser clients (like CLI) omit Origin header — permit them.
+		if origin == "" {
+			return true
+		}
+		// Browser clients must match approved development origins.
+		return isOriginAllowed(origin)
+	},
+}
+
+// StreamContainerLogs streams container logs over WebSocket.
+func (h *Handlers) StreamContainerLogs(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	if !isValidContainer(name) {
+		writeError(w, http.StatusBadRequest, "INVALID_CONTAINER", "Unknown container name: "+name)
+		return
+	}
+
+	follow := true
+	if f := r.URL.Query().Get("follow"); f == "false" {
+		follow = false
+	}
+	tail := r.URL.Query().Get("tail")
+	if tail == "" {
+		tail = "100"
+	}
+
+	// Upgrade connection to WebSocket
+	conn, err := wsUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		// Upgrade already writes HTTP error response if it fails
+		return
+	}
+	defer conn.Close()
+
+	// Context cancellation coordination
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	// Handle incoming client messages / ping-pong / close frames in a reader goroutine
+	go func() {
+		defer cancel()
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				// Client disconnected or sent close frame
+				return
+			}
+		}
+	}()
+
+	// Retrieve container logs from Docker
+	logReader, err := h.docker.Logs(ctx, name, docker.LogOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     follow,
+		Tail:       tail,
+	})
+	if err != nil {
+		conn.WriteMessage(websocket.TextMessage, []byte("Error retrieving logs: "+err.Error()))
+		return
+	}
+	defer logReader.Close()
+
+	// Mutex to protect concurrent writes to WebSocket connection
+	var writeMu sync.Mutex
+	writeLine := func(line string) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		return conn.WriteMessage(websocket.TextMessage, []byte(line))
+	}
+
+	// Stream demuxed lines to client
+	if err := docker.StreamDemuxLines(ctx, logReader, writeLine); err != nil && err != context.Canceled {
+		writeMu.Lock()
+		conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		conn.WriteMessage(websocket.TextMessage, []byte("Stream error: "+err.Error()))
+		writeMu.Unlock()
+	}
+
+	// Clean close frame
+	writeMu.Lock()
+	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "stream finished"))
+	writeMu.Unlock()
 }
 
 // --- Account Handlers ---

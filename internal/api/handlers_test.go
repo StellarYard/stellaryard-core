@@ -385,3 +385,49 @@ func TestAuthenticationMiddleware(t *testing.T) {
 		t.Fatalf("GET /api/v1/accounts with valid auth = %d, want 200", recGood.Code)
 	}
 }
+
+func TestStreamContainerLogsEndpoint(t *testing.T) {
+	s := signer.NewLocalTestSigner()
+	db, err := storage.Open(filepath.Join(t.TempDir(), "logs-test.db"))
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer db.Close()
+
+	const testAPIKey = "super-secret-core-token-xyz-123456"
+	router := NewRouter(nil, db, s, testAPIKey)
+
+	// 1. Invalid container name rejected with 400 when authorized
+	reqBadNameWithAuth := httptest.NewRequest(http.MethodGet, "/api/v1/containers/unknown-app/logs", nil)
+	reqBadNameWithAuth.Header.Set("Authorization", "Bearer "+testAPIKey)
+	recBadNameWithAuth := httptest.NewRecorder()
+	router.ServeHTTP(recBadNameWithAuth, reqBadNameWithAuth)
+	if recBadNameWithAuth.Code != http.StatusBadRequest {
+		t.Fatalf("GET /containers/unknown-app/logs = %d, want 400", recBadNameWithAuth.Code)
+	}
+	e := errorBody(t, recBadNameWithAuth)
+	if e.Error.Code != "INVALID_CONTAINER" {
+		t.Errorf("error code = %q, want INVALID_CONTAINER", e.Error.Code)
+	}
+
+	// 2. Unauthenticated request to /api/v1/containers/horizon/logs rejected with 401
+	recNoAuth := doRequest(t, router, http.MethodGet, "/api/v1/containers/horizon/logs", "")
+	if recNoAuth.Code != http.StatusUnauthorized {
+		t.Fatalf("GET /containers/horizon/logs without auth = %d, want 401", recNoAuth.Code)
+	}
+
+	// 3. Disallowed origin rejected
+	disallowedOriginReq := httptest.NewRequest(http.MethodGet, "/api/v1/containers/horizon/logs", nil)
+	disallowedOriginReq.Header.Set("Authorization", "Bearer "+testAPIKey)
+	disallowedOriginReq.Header.Set("Origin", "http://evil-attacker-site.com")
+	disallowedOriginReq.Header.Set("Connection", "Upgrade")
+	disallowedOriginReq.Header.Set("Upgrade", "websocket")
+	disallowedOriginReq.Header.Set("Sec-WebSocket-Version", "13")
+	disallowedOriginReq.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	disallowedRec := httptest.NewRecorder()
+	router.ServeHTTP(disallowedRec, disallowedOriginReq)
+	if disallowedRec.Code != http.StatusForbidden {
+		t.Errorf("request with evil origin = %d, want 403 Forbidden", disallowedRec.Code)
+	}
+}
+

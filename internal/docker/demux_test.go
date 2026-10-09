@@ -94,3 +94,67 @@ func TestStreamDemuxLinesCancellation(t *testing.T) {
 		t.Errorf("expected 1 line, got %v", received)
 	}
 }
+
+func TestStreamDemuxLinesLargeLine(t *testing.T) {
+	// 256 KiB line - well above default 64 KiB bufio.Scanner limit
+	largePayload := make([]byte, 256*1024)
+	for i := range largePayload {
+		largePayload[i] = 'A' + byte(i%26)
+	}
+
+	var rawBuf bytes.Buffer
+	stdoutWriter := stdcopy.NewStdWriter(&rawBuf, stdcopy.Stdout)
+	_, _ = stdoutWriter.Write(append(largePayload, '\n'))
+
+	var received string
+	err := StreamDemuxLines(context.Background(), &rawBuf, func(line string) error {
+		received = line
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("StreamDemuxLines failed on 256 KiB line: %v", err)
+	}
+
+	if len(received) != len(largePayload) {
+		t.Fatalf("received length %d, want %d", len(received), len(largePayload))
+	}
+	if received != string(largePayload) {
+		t.Fatalf("received content mismatch on large line")
+	}
+}
+
+func TestStreamDemuxLinesExceedingMaxBuffer(t *testing.T) {
+	// Line exceeding MaxLogBufferSize (2 MiB)
+	tooLarge := make([]byte, MaxLogBufferSize+1024)
+	for i := range tooLarge {
+		tooLarge[i] = 'X'
+	}
+
+	var rawBuf bytes.Buffer
+	stdoutWriter := stdcopy.NewStdWriter(&rawBuf, stdcopy.Stdout)
+	_, _ = stdoutWriter.Write(append(tooLarge, '\n'))
+
+	err := StreamDemuxLines(context.Background(), &rawBuf, func(line string) error {
+		return nil
+	})
+
+	if err == nil {
+		t.Fatalf("expected error when line exceeds MaxLogBufferSize, got nil")
+	}
+}
+
+func TestStreamDemuxLinesCallbackError(t *testing.T) {
+	var rawBuf bytes.Buffer
+	stdoutWriter := stdcopy.NewStdWriter(&rawBuf, stdcopy.Stdout)
+	_, _ = stdoutWriter.Write([]byte("line 1\nline 2\n"))
+
+	expectedErr := io.ErrUnexpectedEOF
+	err := StreamDemuxLines(context.Background(), &rawBuf, func(line string) error {
+		return expectedErr
+	})
+
+	if err != expectedErr {
+		t.Fatalf("expected callback error %v, got %v", expectedErr, err)
+	}
+}

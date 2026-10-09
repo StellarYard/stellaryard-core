@@ -8,6 +8,13 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
+// InitialLogBufferSize is the initial capacity of the scanner buffer (64 KiB).
+const InitialLogBufferSize = 64 * 1024
+
+// MaxLogBufferSize is the maximum token size for demuxed container log lines (2 MiB).
+// This accommodates large Soroban diagnostic traces, contract dumps, and transactions.
+const MaxLogBufferSize = 2 * 1024 * 1024
+
 // StreamDemuxLines demultiplexes a Docker container log stream (stdcopy format)
 // and invokes onLine for each emitted text line. It stops when the input stream
 // reaches EOF, an error occurs, or the context is cancelled.
@@ -24,6 +31,8 @@ func StreamDemuxLines(ctx context.Context, src io.Reader, onLine func(line strin
 	}()
 
 	scanner := bufio.NewScanner(pr)
+	buf := make([]byte, InitialLogBufferSize)
+	scanner.Buffer(buf, MaxLogBufferSize)
 	scanDone := make(chan error, 1)
 
 	go func() {

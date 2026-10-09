@@ -1,6 +1,12 @@
 # StellarYard — Ecosystem Reconnaissance & Critical Review
 
-## Phase 1: Ecosystem Landscape (September 2026)
+> **Refresh log** — Phase 1 numbers below were re-verified live on **2026-10-09** against
+> `drips.network/wave/stellar` and `drips.network/wave/stellar/repos`. The original
+> September 2026 snapshot had drifted (737 repos / 442 orgs / 8 waves → live values in
+> the table). Per the playbook: *"Check for an updated version."* Do the same before
+> every submission.
+
+## Phase 1: Ecosystem Landscape (verified 2026-10-09)
 
 ### What the Stellar Stack Offers Right Now
 
@@ -14,14 +20,16 @@
 
 ### Stellar Wave Program — Current State
 
-| Metric | Value |
-|--------|-------|
-| Approved repos | 737 |
-| Organizations | 442 |
-| Completed Waves | 8 (Jan–Aug 2026) |
-| Budget per wave | $60K–$75K |
-| Total disbursed (Jan–Apr) | $255K |
-| Contributors (latest wave) | 782 |
+| Metric | Value | Source |
+|--------|-------|--------|
+| Approved repos | **824** | `drips.network/wave/stellar/repos` (2026-10-09) |
+| Organizations | **504** | `drips.network/wave/stellar` (2026-10-09) |
+| Open issues across program | 326,976 | same |
+| Waves completed | **9** (Jan–Sep 2026) | wave schedule, same page |
+| Next wave | **Wave 10 — Oct 15–22, 2026**, $75K | same |
+| Budget per wave | $60K (Waves 1–3) → **$75K (Waves 4–10)** | same |
+| Announced budget Waves 1–9 | **$630K** (3×$60K + 6×$75K) | sum of published budgets |
+| Contributors (latest wave) | 782 | ⚠️ stale — Wave 8-era figure, not re-verified 2026-10-09 |
 
 ### Approved Repo Categories (by domain)
 
@@ -47,8 +55,8 @@
 
 ### Where StellarYard Fits
 
-**White space identified:**
-- **Local development environment** — No approved Wave repo provides a Docker-based local dev environment for Stellar. Developers currently use `stellar-cli` + manual Docker setup or remote testnet.
+**White space identified:** (re-checked 2026-10-09 against the live approved list)
+- **Local development environment** — No approved Wave repo provides a Docker-based local dev environment for Stellar. Developers currently use `stellar-cli` + manual Docker setup or remote testnet. The top-approved sample (sorted by stars) is payments/escrow/RWA/frontends — no managed local stack.
 - **Multi-component orchestration** — Most tools are single-purpose (SDK, linter, estimator). Nothing orchestrates Horizon + Soroban RPC as a unified local stack.
 - **Developer experience tooling** — CLI + dashboard for managing local Stellar development is genuinely missing.
 

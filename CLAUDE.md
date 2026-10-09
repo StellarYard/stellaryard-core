@@ -4,7 +4,7 @@ This project's agent instructions live in [`AGENTS.md`](./AGENTS.md). Read that 
 
 Claude-specific notes:
 
-- When asked to implement a Wave issue, check `ROADMAP.md` and `ARCHITECTURE_ESSENTIALS.md` before writing code, in that order.
+- When asked to implement an issue, check `ROADMAP.md` and `ARCHITECTURE_ESSENTIALS.md` before writing code, in that order.
 - Update `ROADMAP.md` as part of the same turn/commit as your functional change, not as an afterthought — see `AGENTS.md` rule 5. If you're about to end a session or hand off without having touched `ROADMAP.md`, say so explicitly rather than silently skipping it.
 - If a task appears to require violating any rule in `AGENTS.md` (especially the `Signer` interface boundary), stop and surface that conflict to the user instead of proceeding.
 - **Docker operations have no retry logic.** When implementing container endpoints, always add backoff. Don't just surface raw Docker SDK errors — classify them (transient vs permanent) so consumers can distinguish retryable from hard failures.

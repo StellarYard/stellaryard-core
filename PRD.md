@@ -9,7 +9,7 @@ Core does not have its own UI. It is infrastructure — the thing that makes the
 ## Who It's For
 
 - **Primary**: Stellar/Soroban smart contract developers who currently manage local test networks via raw CLI commands (`stellar network start`, manual `docker` invocations, curl calls to Horizon) and want a single controllable backend instead of juggling multiple tools.
-- **Secondary**: Contributors to StellarYard itself — this repo needs to be legible enough that a Wave contributor can pick up an isolated issue (e.g., "add endpoint to fetch contract invocation history") without reverse-engineering the whole system.
+- **Secondary**: Contributors to StellarYard itself — this repo needs to be legible enough that a new contributor can pick up an isolated issue (e.g., "add endpoint to fetch contract invocation history") without reverse-engineering the whole system.
 - **Not for**: End users managing real funds in v1. Mainnet support is a stated future direction (see Architecture, Signer Interface) but is explicitly out of scope for initial releases.
 
 ## What The Product Actually Needs To Do
@@ -38,7 +38,7 @@ Core does not have its own UI. It is infrastructure — the thing that makes the
 
 - A contributor can run `docker-compose up` and have a working local Horizon + Soroban RPC pair managed entirely through core's API within one command.
 - Dashboard and CLI can both be built against core's OpenAPI spec without needing to read core's source code.
-- Adding a new local/testnet endpoint should be a Trivial-to-Medium Wave issue; it should not require touching the container orchestration layer.
+- Adding a new local/testnet endpoint should be a straightforward, self-contained task; it should not require touching the container orchestration layer.
 
 ## What Would Break
 

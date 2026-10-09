@@ -3,7 +3,7 @@
 ## Tech Stack
 
 - **Language**: Go (1.22+)
-- **HTTP**: standard library `net/http` + `chi` router (lightweight, avoids heavy framework lock-in — important since Wave contributors will have varying Go experience levels)
+- **HTTP**: standard library `net/http` + `chi` router (lightweight, avoids heavy framework lock-in — important since contributors will have varying Go experience levels)
 - **WebSocket**: `gorilla/websocket` for log streaming
 - **Docker control**: official `docker/docker` Go SDK (talks to the Docker daemon via its API, not shell-exec'd `docker` commands — shelling out is fragile and harder to test)
 - **Horizon/Soroban RPC clients**: Stellar's official Go SDK (`stellar/go`) for Horizon and Soroban RPC interaction
@@ -64,7 +64,7 @@ type Signer interface {
 - **V1 implementation**: `LocalTestSigner` — generates and holds testnet-only keypairs in SQLite, signs directly in-process. This is fine *only* because these keys never hold real value.
 - **Future implementation**: `ExternalSigner` — delegates signing to a hardware wallet, browser extension (Freighter-style), or wallet-connect-equivalent flow. Core sends an unsigned XDR envelope out, gets a signed one back. Core itself never sees the mainnet secret key.
 
-Every code path that currently calls `LocalTestSigner` directly must go through the `Signer` interface, never around it. This is the single architectural rule that matters most in this repo — a Wave issue that bypasses it (e.g., "quick way to sign server-side for convenience") should be rejected in review regardless of how small it looks.
+Every code path that currently calls `LocalTestSigner` directly must go through the `Signer` interface, never around it. This is the single architectural rule that matters most in this repo — a pull request or issue that bypasses it (e.g., "quick way to sign server-side for convenience") should be rejected in review regardless of how small it looks.
 
 ## Data Models
 

@@ -6,37 +6,37 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Phase 0 — Foundation (blocks everything downstream)
 
-- [ ] Scaffold Go module, repo structure, CI (lint + test on PR)
-- [ ] `docker-compose.yml` for local Horizon + Soroban RPC
-- [ ] `/api/openapi.yaml` — initial version covering all v1 endpoints listed in `ARCHITECTURE.md`. **This must exist and be merged before any `stellaryard-dashboard` or `stellaryard-cli` issue is opened** — those repos generate their clients from this file. Opening consumer-repo issues before this lands recreates the contract-drift problem this architecture was designed to avoid.
-- [ ] SQLite schema + migrations for `Account`, `ContainerStatus` (if persisted), `ContractDeployment`, `LedgerSnapshot` cache
-- [ ] `Signer` interface + `LocalTestSigner` implementation, with explicit boundary test (raw key never leaves the interface)
+- [x] Scaffold Go module, repo structure, CI (lint + test on PR)
+- [x] `docker-compose.yml` for local Horizon + Soroban RPC
+- [x] `/api/openapi.yaml` — initial version covering all v1 endpoints listed in `ARCHITECTURE.md`.
+- [x] SQLite schema + migrations for `Account` and `ContractDeployment`
+- [~] `Signer` interface + `LocalTestSigner` implementation (boundary tests & StrKey generation pending)
 
 ## Phase 1 — Container orchestration
 
-- [ ] Docker API client wrapper (start/stop/status for named containers)
+- [x] Docker API client wrapper (start/stop/status for named containers)
 - [ ] Health check logic for Horizon + Soroban RPC containers
-- [ ] `POST /containers/{name}/start`, `/stop`
-- [ ] `GET /containers` (list statuses)
+- [x] `POST /containers/{name}/start`, `/stop`
+- [x] `GET /containers` (list statuses)
 - [ ] WS `/containers/{name}/logs` streaming
 
 ## Phase 2 — Accounts
 
 - [ ] Account creation + Friendbot/local-genesis funding
-- [ ] `POST /accounts`, `GET /accounts`, `GET /accounts/{publicKey}`
+- [~] `POST /accounts`, `GET /accounts`, `GET /accounts/{publicKey}` (basic handlers live, real keypairs pending)
 - [ ] Balance lookup via Horizon proxy
 
 ## Phase 3 — Ledger
 
-- [ ] `GET /ledger/snapshot`
-- [ ] `GET /ledger/transactions` (paginated)
-- [ ] Transaction detail enrichment (decode XDR into a usable response shape — decide how much decoding belongs in core vs. left raw for consumers; **this decision isn't made yet and should be resolved before Phase 3 issues open**, not discovered mid-implementation)
+- [~] `GET /ledger/snapshot` (placeholder response wired)
+- [~] `GET /ledger/transactions` (empty array response wired)
+- [ ] Transaction detail enrichment (decode XDR into a usable response shape)
 
 ## Phase 4 — Contracts
 
-- [ ] WASM upload/deploy flow (`POST /contracts/deploy`)
-- [ ] Contract invocation (`POST /contracts/{contractId}/invoke`)
-- [ ] Deployment record persistence
+- [~] WASM upload/deploy flow (`POST /contracts/deploy` — stub returns 501)
+- [~] Contract invocation (`POST /contracts/{contractId}/invoke` — stub returns 501)
+- [x] Deployment record persistence (SQLite storage methods implemented)
 
 ## Phase 5 — Hardening (required before calling this "100% ready," not optional polish)
 

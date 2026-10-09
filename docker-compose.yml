@@ -22,7 +22,7 @@ services:
   soroban-rpc:
     image: stellar/soroban-rpc:latest
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       - STELLAR_NETWORK=testnet
       - HORIZON_URL=http://horizon:8000

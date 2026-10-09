@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/StellarYard/stellaryard-core/internal/signer"
 	"github.com/StellarYard/stellaryard-core/internal/storage"
 )
 
@@ -22,7 +23,7 @@ func newTestRouter(t *testing.T) http.Handler {
 		t.Fatalf("storage.Open() failed: %v", err)
 	}
 	t.Cleanup(func() { db.Close() })
-	return NewRouter(nil, db)
+	return NewRouter(nil, db, signer.NewLocalTestSigner())
 }
 
 func doRequest(t *testing.T, h http.Handler, method, target, body string) *httptest.ResponseRecorder {
@@ -229,24 +230,45 @@ func TestLedgerTransactionsReturnsArray(t *testing.T) {
 	}
 }
 
-func TestCORSHeadersAllowLocalhostDev(t *testing.T) {
+func TestCORSHeadersAllowApprovedDevOrigins(t *testing.T) {
 	h := newTestRouter(t)
-	rec := doRequest(t, h, http.MethodGet, "/api/v1/ledger/snapshot", "")
 
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
-		t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, "*")
+	// Approved origin: http://localhost:3000
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ledger/snapshot", nil)
+	req.Header.Set("Origin", "http://localhost:3000")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:3000" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, "http://localhost:3000")
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Methods"); !strings.Contains(got, "POST") {
 		t.Errorf("Access-Control-Allow-Methods = %q, want it to include POST", got)
 	}
+
+	// Disallowed origin: http://evil.com
+	reqBad := httptest.NewRequest(http.MethodOptions, "/api/v1/accounts", nil)
+	reqBad.Header.Set("Origin", "http://evil.com")
+	recBad := httptest.NewRecorder()
+	h.ServeHTTP(recBad, reqBad)
+
+	if recBad.Code != http.StatusForbidden {
+		t.Errorf("OPTIONS from disallowed origin = %d, want 403", recBad.Code)
+	}
+	if got := recBad.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("disallowed origin received Access-Control-Allow-Origin header %q", got)
+	}
 }
 
-func TestPreflightOptionsReturns200(t *testing.T) {
+func TestPreflightOptionsReturns200ForApprovedOrigin(t *testing.T) {
 	h := newTestRouter(t)
-	rec := doRequest(t, h, http.MethodOptions, "/api/v1/accounts", "")
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/accounts", nil)
+	req.Header.Set("Origin", "http://localhost:3000")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Errorf("OPTIONS = %d, want 200", rec.Code)
+		t.Errorf("OPTIONS with approved origin = %d, want 200", rec.Code)
 	}
 }
 
@@ -256,5 +278,44 @@ func TestUnknownRouteReturns404(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("GET unknown route = %d, want 404", rec.Code)
+	}
+}
+
+// TestCreateAccountUsesSDKAndSigner ensures account creation produces a valid Stellar SDK address
+// that is registered in the Signer and does NOT leak secret key material into the database or response.
+func TestCreateAccountUsesSDKAndSigner(t *testing.T) {
+	s := signer.NewLocalTestSigner()
+	db, err := storage.Open(filepath.Join(t.TempDir(), "sdk-test.db"))
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer db.Close()
+
+	router := NewRouter(nil, db, s)
+	rec := doRequest(t, router, http.MethodPost, "/api/v1/accounts", `{"label":"sdk-acc"}`)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /api/v1/accounts = %d, want 201: %s", rec.Code, rec.Body.String())
+	}
+
+	var created struct {
+		PublicKey string `json:"publicKey"`
+		Label     string `json:"label"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+
+	// 1. Must be registered with the signer
+	if !s.HasKey(nil, created.PublicKey) {
+		t.Errorf("signer does not hold key for created account %s", created.PublicKey)
+	}
+
+	// 2. Database record must be retrievable
+	acc, err := db.GetAccount(created.PublicKey)
+	if err != nil || acc == nil {
+		t.Fatalf("db.GetAccount failed: %v", err)
+	}
+	if acc.PublicKey != created.PublicKey {
+		t.Errorf("db public key %s != created %s", acc.PublicKey, created.PublicKey)
 	}
 }

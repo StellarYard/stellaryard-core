@@ -12,6 +12,7 @@ import (
 
 	"github.com/StellarYard/stellaryard-core/internal/api"
 	"github.com/StellarYard/stellaryard-core/internal/docker"
+	"github.com/StellarYard/stellaryard-core/internal/signer"
 	"github.com/StellarYard/stellaryard-core/internal/storage"
 )
 
@@ -44,8 +45,11 @@ func main() {
 	defer dockerClient.Close()
 	log.Println("Docker client connected")
 
+	// Initialize Signer (holds testnet keys in-memory behind interface boundary)
+	signService := signer.NewLocalTestSigner()
+
 	// Create router
-	router := api.NewRouter(dockerClient, db)
+	router := api.NewRouter(dockerClient, db, signService)
 
 	// Create HTTP server
 	srv := &http.Server{

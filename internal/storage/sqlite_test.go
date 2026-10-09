@@ -54,7 +54,6 @@ func newAccount(id, pub, label string, created time.Time) *Account {
 	return &Account{
 		ID:        id,
 		PublicKey: pub,
-		SecretKey: "S-" + id,
 		Label:     label,
 		Network:   "local",
 		CreatedAt: created,
@@ -79,7 +78,7 @@ func TestCreateAndGetAccountRoundTrip(t *testing.T) {
 	}
 
 	if got.ID != in.ID || got.PublicKey != in.PublicKey || got.Label != in.Label ||
-		got.SecretKey != in.SecretKey || got.Network != in.Network {
+		got.Network != in.Network {
 		t.Errorf("round trip mismatch:\n got  %+v\n want %+v", *got, *in)
 	}
 	if !got.CreatedAt.Equal(created) {
@@ -212,4 +211,81 @@ func TestOperationsAfterCloseReturnError(t *testing.T) {
 	if _, err := db.ListAccounts(); err == nil {
 		t.Error("ListAccounts() after Close() succeeded, want error")
 	}
+}
+
+// TestMigrationPurgesLegacySecretKeys verifies that an existing database
+// containing legacy plaintext secret keys has those keys purged when opened,
+// while preserving all other account metadata (ID, public key, label, network, timestamp).
+func TestMigrationPurgesLegacySecretKeys(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "legacy.db")
+
+	// 1. Manually create a legacy database schema with a plaintext secret key
+	dbDirect, err := Open(dbPath)
+	if err != nil {
+		t.Fatalf("setup Open failed: %v", err)
+	}
+
+	createdTime := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
+	// Directly insert a row simulating pre-P0 schema containing a plaintext secret key
+	_, err = dbDirect.conn.Exec(
+		`INSERT INTO accounts (id, public_key, secret_key, label, network, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		"legacy-acc-1", "GBM4V7G4EXAMPLEPUBKEY", "SBSECRETTESTNETKEYPLAINTEXT", "my-legacy-account", "local", createdTime,
+	)
+	if err != nil {
+		t.Fatalf("failed to insert legacy row: %v", err)
+	}
+
+	// Verify the legacy secret is actually present on disk before migration purge
+	var initialSecret string
+	err = dbDirect.conn.QueryRow(`SELECT secret_key FROM accounts WHERE id = ?`, "legacy-acc-1").Scan(&initialSecret)
+	if err != nil || initialSecret != "SBSECRETTESTNETKEYPLAINTEXT" {
+		t.Fatalf("initial secret not found: %v, got %q", err, initialSecret)
+	}
+	dbDirect.Close()
+
+	// 2. Re-open the database with Open() which runs migrations
+	reopenedDB, err := Open(dbPath)
+	if err != nil {
+		t.Fatalf("re-open failed: %v", err)
+	}
+	defer reopenedDB.Close()
+
+	// 3. Verify the secret column is now empty in SQLite
+	var purgedSecret string
+	err = reopenedDB.conn.QueryRow(`SELECT secret_key FROM accounts WHERE id = ?`, "legacy-acc-1").Scan(&purgedSecret)
+	if err != nil {
+		t.Fatalf("query secret_key failed: %v", err)
+	}
+	if purgedSecret != "" {
+		t.Errorf("expected secret_key to be purged to empty string, got: %q", purgedSecret)
+	}
+
+	// 4. Verify all other fields are preserved
+	acc, err := reopenedDB.GetAccount("GBM4V7G4EXAMPLEPUBKEY")
+	if err != nil || acc == nil {
+		t.Fatalf("GetAccount failed: %v", err)
+	}
+	if acc.ID != "legacy-acc-1" {
+		t.Errorf("ID = %q, want legacy-acc-1", acc.ID)
+	}
+	if acc.PublicKey != "GBM4V7G4EXAMPLEPUBKEY" {
+		t.Errorf("PublicKey = %q, want GBM4V7G4EXAMPLEPUBKEY", acc.PublicKey)
+	}
+	if acc.Label != "my-legacy-account" {
+		t.Errorf("Label = %q, want my-legacy-account", acc.Label)
+	}
+	if acc.Network != "local" {
+		t.Errorf("Network = %q, want local", acc.Network)
+	}
+	if !acc.CreatedAt.Equal(createdTime) {
+		t.Errorf("CreatedAt = %v, want %v", acc.CreatedAt, createdTime)
+	}
+
+	// 5. Test idempotency: re-running migrations does not cause error or corrupt state
+	thirdDB, err := Open(dbPath)
+	if err != nil {
+		t.Fatalf("third Open failed: %v", err)
+	}
+	thirdDB.Close()
 }

@@ -6,7 +6,7 @@ func migrations() []string {
 		`CREATE TABLE IF NOT EXISTS accounts (
 			id TEXT PRIMARY KEY,
 			public_key TEXT NOT NULL UNIQUE,
-			secret_key TEXT NOT NULL,
+			secret_key TEXT NOT NULL DEFAULT '',
 			label TEXT NOT NULL DEFAULT '',
 			network TEXT NOT NULL DEFAULT 'local',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -21,5 +21,7 @@ func migrations() []string {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_accounts_network ON accounts(network)`,
 		`CREATE INDEX IF NOT EXISTS idx_deployments_network ON contract_deployments(network)`,
+		// Idempotent migration: purge any legacy plaintext secret keys from earlier versions
+		`UPDATE accounts SET secret_key = '' WHERE secret_key != ''`,
 	}
 }

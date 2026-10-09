@@ -22,7 +22,6 @@ type DB struct {
 type Account struct {
 	ID        string    `json:"id"`
 	PublicKey string    `json:"publicKey"`
-	SecretKey string    `json:"-"` // testnet only; never serialized
 	Label     string    `json:"label"`
 	Network   string    `json:"network"` // "local" | "testnet"
 	CreatedAt time.Time `json:"createdAt"`
@@ -71,29 +70,32 @@ func (db *DB) migrate() error {
 }
 
 // CreateAccount inserts a new account record.
+// Secret keys are NEVER stored in the database; key material is held
+// exclusively by the configured Signer implementation.
 func (db *DB) CreateAccount(acc *Account) error {
 	_, err := db.conn.Exec(
 		`INSERT INTO accounts (id, public_key, secret_key, label, network, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		acc.ID, acc.PublicKey, acc.SecretKey, acc.Label, acc.Network, acc.CreatedAt,
+		 VALUES (?, ?, '', ?, ?, ?)`,
+		acc.ID, acc.PublicKey, acc.Label, acc.Network, acc.CreatedAt,
 	)
 	return err
 }
 
-// GetAccount returns an account by public key.
+// GetAccount returns an account by public key without exposing any secret key.
 func (db *DB) GetAccount(publicKey string) (*Account, error) {
 	acc := &Account{}
+	var storedSecret string
 	err := db.conn.QueryRow(
 		`SELECT id, public_key, secret_key, label, network, created_at
 		 FROM accounts WHERE public_key = ?`, publicKey,
-	).Scan(&acc.ID, &acc.PublicKey, &acc.SecretKey, &acc.Label, &acc.Network, &acc.CreatedAt)
+	).Scan(&acc.ID, &acc.PublicKey, &storedSecret, &acc.Label, &acc.Network, &acc.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	return acc, err
 }
 
-// ListAccounts returns all managed accounts.
+// ListAccounts returns all managed accounts without exposing any secret key.
 func (db *DB) ListAccounts() ([]Account, error) {
 	rows, err := db.conn.Query(
 		`SELECT id, public_key, secret_key, label, network, created_at FROM accounts ORDER BY created_at DESC`)
@@ -105,7 +107,8 @@ func (db *DB) ListAccounts() ([]Account, error) {
 	var accounts []Account
 	for rows.Next() {
 		var acc Account
-		if err := rows.Scan(&acc.ID, &acc.PublicKey, &acc.SecretKey, &acc.Label, &acc.Network, &acc.CreatedAt); err != nil {
+		var storedSecret string
+		if err := rows.Scan(&acc.ID, &acc.PublicKey, &storedSecret, &acc.Label, &acc.Network, &acc.CreatedAt); err != nil {
 			return nil, err
 		}
 		accounts = append(accounts, acc)

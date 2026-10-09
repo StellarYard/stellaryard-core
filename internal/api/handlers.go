@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/StellarYard/stellaryard-core/internal/docker"
+	"github.com/StellarYard/stellaryard-core/internal/signer"
 	"github.com/StellarYard/stellaryard-core/internal/storage"
 	"github.com/go-chi/chi/v5"
 )
@@ -16,6 +17,7 @@ import (
 type Handlers struct {
 	docker *docker.Client
 	db     *storage.DB
+	signer signer.Signer
 }
 
 // ErrorResponse represents an API error.
@@ -78,20 +80,33 @@ func (h *Handlers) StopContainer(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Label string `json:"label"`
+		Label   string `json:"label"`
+		Network string `json:"network"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 		return
 	}
 
+	network := req.Network
+	if network == "" {
+		network = "local"
+	}
+
+	// Generate keypair via the Signer boundary.
+	// Raw secret keys NEVER enter this handler or SQLite.
+	pubKey, err := h.signer.GenerateKeypair(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "SIGNER_ERROR", "Failed to generate keypair: "+err.Error())
+		return
+	}
+
 	acc := &storage.Account{
 		ID:        generateID(),
-		PublicKey: placeholderKey("G"), // Placeholder — testnet only
-		SecretKey: placeholderKey("S"), // Placeholder — testnet only
+		PublicKey: pubKey,
 		Label:     req.Label,
-		Network:   "local",
-		CreatedAt: time.Now(),
+		Network:   network,
+		CreatedAt: time.Now().UTC(),
 	}
 
 	if err := h.db.CreateAccount(acc); err != nil {
@@ -171,22 +186,4 @@ func generateID() string {
 		return hex.EncodeToString([]byte(time.Now().UTC().Format("20060102150405.000000000")))[:32]
 	}
 	return hex.EncodeToString(b)
-}
-
-// placeholderKey returns a Stellar-shaped test key: exactly 56 characters
-// beginning with prefix, matching the length of a real Stellar public or
-// secret key so downstream formatting and validation behave normally.
-//
-// It is NOT a real keypair and must never be used outside a local or
-// testnet context.
-func placeholderKey(prefix string) string {
-	const stellarKeyLen = 56
-	if len(prefix) >= stellarKeyLen {
-		return prefix
-	}
-	id := generateID()
-	for len(prefix)+len(id) < stellarKeyLen {
-		id += id
-	}
-	return prefix + id[:stellarKeyLen-len(prefix)]
 }

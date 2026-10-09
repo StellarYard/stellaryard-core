@@ -1,5 +1,6 @@
 # Binaries
 stellaryard-core
+server
 *.exe
 *.exe~
 *.dll

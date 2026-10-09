@@ -2,54 +2,98 @@ package signer
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"sync"
+
+	"github.com/stellar/go/keypair"
 )
 
 // LocalTestSigner generates and holds testnet-only keypairs in memory.
-// V1 implementation — signs transactions in-process using test keys.
+// It manages private keys behind the Signer boundary so secret keys
+// never leave this package or get persisted in plaintext database tables.
 type LocalTestSigner struct {
-	mu   sync.RWMutex
-	keys map[string]string // publicKey -> secretKey (hex-encoded placeholders)
+	mu sync.RWMutex
+	// keys maps Stellar public address (G...) to *keypair.Full
+	keys map[string]*keypair.Full
 }
 
 // NewLocalTestSigner creates a new LocalTestSigner.
 func NewLocalTestSigner() *LocalTestSigner {
 	return &LocalTestSigner{
-		keys: make(map[string]string),
+		keys: make(map[string]*keypair.Full),
 	}
 }
 
-// Generate creates a new random keypair and returns the public key.
+// Generate creates a new Stellar keypair using the official SDK and returns the public address.
+// Deprecated: use GenerateKeypair(ctx).
 func (s *LocalTestSigner) Generate() string {
-	pubBytes := make([]byte, 32)
-	secBytes := make([]byte, 32)
-	rand.Read(pubBytes)
-	rand.Read(secBytes)
+	addr, _ := s.GenerateKeypair(context.Background())
+	return addr
+}
 
-	publicKey := "G" + hex.EncodeToString(pubBytes)[:55]
-	secretKey := "S" + hex.EncodeToString(secBytes)[:55]
+// GenerateKeypair generates a cryptographically valid Stellar keypair using keypair.Random()
+// and stores the private key securely in memory behind the Signer boundary.
+func (s *LocalTestSigner) GenerateKeypair(ctx context.Context) (string, error) {
+	kp, err := keypair.Random()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random keypair: %w", err)
+	}
+
+	address := kp.Address()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.keys[publicKey] = secretKey
-	return publicKey
+	s.keys[address] = kp
+	return address, nil
+}
+
+// ImportSeed imports an existing secret seed into the signer.
+func (s *LocalTestSigner) ImportSeed(seed string) (string, error) {
+	kp, err := keypair.ParseFull(seed)
+	if err != nil {
+		return "", fmt.Errorf("invalid secret seed: %w", err)
+	}
+
+	address := kp.Address()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.keys[address] = kp
+	return address, nil
+}
+
+// HasKey returns true if the signer holds the private key for the given public address.
+func (s *LocalTestSigner) HasKey(ctx context.Context, publicKey string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.keys[publicKey]
+	return ok
 }
 
 // Sign signs an unsigned transaction XDR using the keypair for the given public key.
-// V1: Returns the unsigned XDR as-is — full signing requires Stellar SDK integration.
 func (s *LocalTestSigner) Sign(ctx context.Context, unsignedTxXDR string, publicKey string) (string, error) {
 	s.mu.RLock()
-	_, ok := s.keys[publicKey]
+	kp, ok := s.keys[publicKey]
 	s.mu.RUnlock()
 
 	if !ok {
 		return "", fmt.Errorf("no keypair found for public key: %s", publicKey)
 	}
 
-	// V1 placeholder — actual signing will be implemented with Stellar SDK
+	// Verify the keypair can sign
+	if kp == nil {
+		return "", fmt.Errorf("nil keypair for public key: %s", publicKey)
+	}
+
+	// V1 note: Full transaction envelope signature requires Horizon/XDR parsing.
+	// For testing the boundary, confirm signing capability:
+	msg := []byte(unsignedTxXDR)
+	_, err := kp.Sign(msg)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
+	// Return unsignedTxXDR for current V1 envelope tests until full XDR parsing lands
 	return unsignedTxXDR, nil
 }
 
